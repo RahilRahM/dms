@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { hasPermission } from '../../features/auth/authSlice';
 import '../../styles/DocumentView.css';
 
 function DocumentView({ document, editMode, onEdit, onSave, onCancel }) {
+  const canWrite = useSelector(state => hasPermission(state, 'write'));
   const [editedDoc, setEditedDoc] = useState(document);
 
   useEffect(() => {
@@ -69,7 +72,7 @@ function DocumentView({ document, editMode, onEdit, onSave, onCancel }) {
           <p><strong>Last Modified:</strong> {document.lastModified}</p>
           <p><strong>Description:</strong> {document.description}</p>
           <p><strong>Tags:</strong> {document.tags.join(', ')}</p>
-          <button onClick={onEdit}>Edit</button>
+          {canWrite && <button onClick={onEdit}>Edit</button>}
         </div> 
       )}
     </div>

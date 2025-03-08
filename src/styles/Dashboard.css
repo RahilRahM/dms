@@ -51,3 +51,33 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   overflow: auto;
 }
+
+.table-container {
+  margin-top: 20px;
+  overflow-x: auto;
+}
+
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sortable-header:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.status-chip {
+  border-radius: 16px;
+  padding: 4px 12px;
+  font-size: 0.875rem;
+}
+
+.status-active {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-inactive {
+  background-color: #ffebee;
+  color: #c62828;
+}

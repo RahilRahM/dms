@@ -1,10 +1,21 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-// Hardcoded user credentials
-const validCredentials = {
-  username: 'admin',
-  password: 'admin123'
-};
+const validUsers = [
+  { 
+    id: 1, 
+    username: 'admin', 
+    password: 'admin123', 
+    role: 'admin',
+    permissions: ['read', 'write', 'delete', 'manage_users'] 
+  },
+  { 
+    id: 2, 
+    username: 'user', 
+    password: 'user123', 
+    role: 'normal',
+    permissions: ['read', 'write'] 
+  }
+];
 
 const initialState = {
   user: JSON.parse(localStorage.getItem('user')) || null,
@@ -32,13 +43,24 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.user = null;
       localStorage.removeItem('user');
+    },
+    createUser: (state, action) => {
+      validUsers.push(action.payload);
     }
   }
 });
 
-export const { loginSuccess, loginFailed, logout } = authSlice.actions;
+export const { loginSuccess, loginFailed, logout, createUser } = authSlice.actions;
 export const validateCredentials = (credentials) => {
-  return credentials.username === validCredentials.username && 
-         credentials.password === validCredentials.password;
+  const user = validUsers.find(u => 
+    u.username === credentials.username && 
+    u.password === credentials.password
+  );
+  return user || null;
 };
+
+export const hasPermission = (state, permission) => {
+  return state.auth.user?.permissions?.includes(permission) || false;
+};
+
 export default authSlice.reducer;
