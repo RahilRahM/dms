@@ -13,7 +13,7 @@ const validUsers = [
     username: 'user', 
     password: 'user123', 
     role: 'normal',
-    permissions: ['read', 'write'] 
+    permissions: ['read', 'create'] // Changed permissions for normal users
   }
 ];
 

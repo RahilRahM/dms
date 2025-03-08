@@ -11,6 +11,7 @@ import '../../styles/Dashboard.css';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout, hasPermission } from '../../features/auth/authSlice';
 import UserManagement from '../Users/UserManagement';
+import FoldersView from '../Folders/FoldersView';
 
 function Dashboard() {
   const [documents] = useState(sampleDocuments);
@@ -22,9 +23,9 @@ function Dashboard() {
   const dispatch = useDispatch();
 
   const isAdmin = user?.role === 'admin';
-  const auth = useSelector(state => state.auth);
-  const canManageUsers = useSelector(state => hasPermission(state, 'manage_users'));
-  const canWrite = useSelector(state => hasPermission(state, 'write'));
+  const canCreate = useSelector(state => 
+    hasPermission(state, 'create') || hasPermission(state, 'write')
+  );
 
   const handleDocumentClick = (doc) => {
     setSelectedDocument(doc);
@@ -50,11 +51,11 @@ function Dashboard() {
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             Document Management System
           </Typography>
-          {isAdmin && (  // Changed from canManageUsers to isAdmin
+          {isAdmin && (
             <IconButton 
               color="inherit" 
               onClick={() => setActiveTab('users')}
-              sx={{ mr: 2 }}  // Added margin right
+              sx={{ mr: 2 }}
             >
               <PersonIcon />
             </IconButton>
@@ -65,8 +66,8 @@ function Dashboard() {
         </Toolbar>
         <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} sx={{ px: 2 }}>
           <Tab value="documents" label="Documents" />
-          {canWrite && <Tab value="folders" label="Folders" />}
-          {isAdmin && <Tab value="users" label="Users" />}  // Changed from canManageUsers to isAdmin
+          {canCreate && <Tab value="folders" label="Folders" />}
+          {isAdmin && <Tab value="users" label="Users" />}
         </Tabs>
       </AppBar>
       
@@ -104,7 +105,7 @@ function Dashboard() {
         {activeTab === 'folders' && (
           <FoldersView />
         )}
-        {activeTab === 'users' && (
+        {activeTab === 'users' && isAdmin && (
           <UserManagement />
         )}
       </Box>

@@ -19,10 +19,12 @@ const Login = ({ onSwitchToSignup }) => {
 
     setError('');
     
-    if (validateCredentials(formData)) {
+    const user = validateCredentials(formData);
+    if (user) {
       dispatch(loginSuccess({ 
-        username: formData.username,
-        role: 'admin'
+        username: user.username,
+        role: user.role,
+        permissions: user.permissions // Include permissions
       }));
     } else {
       dispatch(loginFailed('Invalid credentials'));
