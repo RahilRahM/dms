@@ -6,5 +6,12 @@ export const store = configureStore({
   reducer: {
     auth: authReducer,
     documents: documentsReducer
-  }
+  },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        // Ignore these paths in the state
+        ignoredPaths: ['documents.currentFolder'],
+      },
+    }),
 });

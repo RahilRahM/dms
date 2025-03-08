@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { 
   Paper, Typography, List, ListItem, ListItemIcon, ListItemText,
   IconButton, Button, Dialog, TextField, Breadcrumbs, Link,
-  Box, Menu, MenuItem, Tooltip 
+  Box, Menu, MenuItem, Tooltip, Checkbox, ListItemSecondaryAction,
+  DialogActions, DialogContent, DialogContentText
 } from '@mui/material';
 import { 
   Folder as FolderIcon, 
@@ -10,14 +11,18 @@ import {
   ArrowBack as ArrowBackIcon,
   Add as AddIcon,
   Upload as UploadIcon,
-  Description as FileIcon
+  Description as FileIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  FileCopy as FileCopyIcon,
+  Sort as SortIcon
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
-import { addFolder, addDocument, setCurrentFolder } from '../../features/documents/documentsSlice';
+import { addFolder, addDocument, setCurrentFolder, deleteItem } from '../../features/documents/documentsSlice';
 
 function FoldersView() {
   const dispatch = useDispatch();
-  const { folders, currentFolder: reduxCurrentFolder } = useSelector(state => state.documents);
+  const { folders, documents, currentFolder: reduxCurrentFolder } = useSelector(state => state.documents);
   
   const [currentFolder, setCurrentFolder] = useState(null);
   const [path, setPath] = useState([{ id: null, name: 'Root' }]);
@@ -25,20 +30,65 @@ function FoldersView() {
   const [newFolderName, setNewFolderName] = useState('');
   const [files, setFiles] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
-
-  const getCurrentFolders = () => 
-    folders.filter(f => f.parent === currentFolder?.id);
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [contextMenu, setContextMenu] = useState(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [sortMenuAnchorEl, setSortMenuAnchorEl] = useState(null);  // Add this state
 
   const handleFolderClick = (folder) => {
-    setCurrentFolder(folder);
-    setPath([...path, folder]);
+    try {
+      const folderData = folder ? {
+        id: folder.id,
+        name: folder.name,
+        parent: folder.parent,
+        type: 'folder',
+        itemType: 'folder'  // Add this to ensure consistency
+      } : {
+        id: null,
+        name: 'Root',
+        parent: null,
+        type: 'folder',
+        itemType: 'folder'
+      };
+
+      // Update Redux state
+      dispatch(setCurrentFolder(folderData));
+      
+      // Update local state
+      setCurrentFolder(folderData);
+
+      // Update path
+      if (!folder || folder.id === null) {
+        setPath([{ id: null, name: 'Root' }]);
+      } else {
+        setPath(prev => [...prev, folderData]);
+      }
+
+    } catch (error) {
+      console.error('Error in handleFolderClick:', error);
+    }
+  };
+
+  const handleBreadcrumbClick = (item, index) => {
+    try {
+      const newPath = path.slice(0, index + 1);
+      setPath(newPath);
+      const folderToSet = newPath[newPath.length - 1];
+      handleFolderClick(folderToSet);
+    } catch (error) {
+      console.error('Error in handleBreadcrumbClick:', error);
+    }
   };
 
   const handleBackClick = () => {
     const newPath = [...path];
+    const previousFolder = newPath[newPath.length - 2] || null;
     newPath.pop();
     setPath(newPath);
-    setCurrentFolder(newPath[newPath.length - 1]);
+    handleFolderClick(previousFolder);
   };
 
   const handleCreateFolder = () => {
@@ -61,7 +111,7 @@ function FoldersView() {
       type: file.type,
       size: file.size,
       lastModified: file.lastModified,
-      parent: currentFolder?.id || null,
+      folderId: currentFolder?.id || null,
       metadata: {
         createdAt: new Date().toISOString(),
         type: file.type,
@@ -70,6 +120,54 @@ function FoldersView() {
     }));
     dispatch(addDocument(uploadedFiles));
     setAnchorEl(null);
+  };
+
+  const handleRightClick = (event, item) => {
+    event.preventDefault();
+    setContextMenu({
+      mouseX: event.clientX - 2,
+      mouseY: event.clientY - 4,
+      item
+    });
+  };
+
+  const handleDelete = (item) => {
+    dispatch(deleteItem({
+      id: item.id,
+      type: item.itemType || item.type
+    }));
+    setDeleteConfirmOpen(false);
+    setItemToDelete(null);
+  };
+
+  const handleSort = (field) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const getCurrentFolders = () => 
+    folders.filter(f => f.parent === (currentFolder?.id ?? null));
+
+  const getCurrentDocuments = () =>
+    documents.filter(doc => doc.folderId === (currentFolder?.id ?? null));
+
+  const sortedItems = [
+    ...getCurrentFolders().map(f => ({ ...f, itemType: 'folder' })),
+    ...getCurrentDocuments().map(d => ({ ...d, itemType: 'file' }))
+  ].sort((a, b) => {
+    if (a.itemType !== b.itemType) {
+      return a.itemType === 'folder' ? -1 : 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  const handleFileClick = (file) => {
+    // Handle file click
+    console.log('File clicked:', file);
   };
 
   return (
@@ -82,12 +180,9 @@ function FoldersView() {
           <Breadcrumbs sx={{ ml: 2 }}>
             {path.map((item, index) => (
               <Link
-                key={item.id}
+                key={item.id ?? 'root'}
                 component="button"
-                onClick={() => {
-                  setPath(path.slice(0, index + 1));
-                  setCurrentFolder(item);
-                }}
+                onClick={() => handleBreadcrumbClick(item, index)}
                 sx={{ cursor: 'pointer' }}
               >
                 {item.name}
@@ -107,6 +202,58 @@ function FoldersView() {
           </Button>
         </div>
       </Box>
+
+      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+        <Button
+          size="small"
+          startIcon={<SortIcon />}
+          onClick={(e) => setSortMenuAnchorEl(e.currentTarget)}  // Changed this
+        >
+          Sort By {sortBy === 'name' ? '(Name)' : '(Date)'}
+        </Button>
+        {selectedItems.length > 0 && (
+          <>
+            <Button
+              size="small"
+              startIcon={<FileCopyIcon />}
+              onClick={() => handleCopySelected()}
+            >
+              Copy {selectedItems.length} items
+            </Button>
+            <Button
+              size="small"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={() => {
+                setItemToDelete({ type: 'multiple', ids: selectedItems });
+                setDeleteConfirmOpen(true);
+              }}
+            >
+              Delete {selectedItems.length} items
+            </Button>
+          </>
+        )}
+      </Box>
+
+      {/* Add new Sort Menu */}
+      <Menu
+        anchorEl={sortMenuAnchorEl}
+        open={Boolean(sortMenuAnchorEl)}
+        onClose={() => setSortMenuAnchorEl(null)}
+      >
+        <MenuItem onClick={() => {
+          handleSort('name');
+          setSortMenuAnchorEl(null);
+        }}>
+          <ListItemText>Sort by Name</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => {
+          handleSort('date');
+          setSortMenuAnchorEl(null);
+        }}>
+          <ListItemText>Sort by Date</ListItemText>
+        </MenuItem>
+      </Menu>
 
       <Menu
         anchorEl={anchorEl}
@@ -137,31 +284,51 @@ function FoldersView() {
       </Menu>
 
       <List sx={{ flexGrow: 1, overflow: 'auto' }}>
-        {getCurrentFolders().map((folder) => (
+        {sortedItems.map((item) => (
           <ListItem
-            key={folder.id}
-            button
-            onClick={() => handleFolderClick(folder)}
+            key={`${item.itemType}-${item.id}`}
+            onClick={() => item.itemType === 'folder' ? handleFolderClick(item) : handleFileClick(item)}
+            sx={{
+              cursor: 'pointer',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+              },
+            }}
           >
+            <Checkbox
+              edge="start"
+              checked={selectedItems.includes(item.id)}
+              onChange={(e) => {
+                e.stopPropagation();
+                setSelectedItems(prev =>
+                  prev.includes(item.id)
+                    ? prev.filter(id => id !== item.id)
+                    : [...prev, item.id]
+                );
+              }}
+            />
             <ListItemIcon>
-              <FolderIcon />
+              {item.itemType === 'folder' ? <FolderIcon color="primary" /> : <FileIcon />}
             </ListItemIcon>
-            <ListItemText primary={folder.name} />
+            <ListItemText 
+              primary={item.name}
+              secondary={item.itemType === 'file' && (
+                `${(item.size / 1024).toFixed(2)} KB • Last modified: ${new Date(item.lastModified).toLocaleDateString()}`
+              )}
+            />
+            <ListItemSecondaryAction>
+              <IconButton 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setItemToDelete(item);
+                  setDeleteConfirmOpen(true);
+                }}
+              >
+                <DeleteIcon />
+              </IconButton>
+            </ListItemSecondaryAction>
           </ListItem>
         ))}
-        {files
-          .filter(file => file.parent === currentFolder?.id)
-          .map(file => (
-            <ListItem key={file.id}>
-              <ListItemIcon>
-                <FileIcon />
-              </ListItemIcon>
-              <ListItemText 
-                primary={file.name}
-                secondary={`${(file.size / 1024).toFixed(2)} KB • ${new Date(file.lastModified).toLocaleDateString()}`}
-              />
-            </ListItem>
-          ))}
       </List>
 
       <Dialog open={newFolderDialog} onClose={() => setNewFolderDialog(false)}>
@@ -183,6 +350,54 @@ function FoldersView() {
             Create
           </Button>
         </Box>
+      </Dialog>
+
+      <Menu
+        open={Boolean(contextMenu)}
+        onClose={() => setContextMenu(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu !== null
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
+      >
+        <MenuItem onClick={() => {/* Handle rename */}}>
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Rename</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => {
+          setItemToDelete(contextMenu.item);
+          setDeleteConfirmOpen(true);
+          setContextMenu(null);
+        }}>
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Delete</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+      >
+        <DialogContent>
+          <DialogContentText>
+            {itemToDelete?.type === 'multiple'
+              ? `Are you sure you want to delete ${selectedItems.length} items?`
+              : `Are you sure you want to delete "${itemToDelete?.name}"?`
+            }
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+          <Button onClick={() => handleDelete(itemToDelete)} color="error">
+            Delete
+          </Button>
+        </DialogActions>
       </Dialog>
     </Paper>
   );
